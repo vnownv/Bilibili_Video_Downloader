@@ -35,6 +35,22 @@ def get_cid_by_bvid(bvid) -> int:
     return 1 if json['code'] else json['data']['View']['cid']
 
 
+def get_cids_by_bvid(bvid) -> []:
+    web_interface_view_detail_params['bvid'] = bvid
+    json = requests.get(url=Bilibili_API['web_interface_view_detail'],
+                        params=web_interface_view_detail_params,
+                        cookies=bilibili_cookies).json()
+    if json['code']:
+        return []
+
+    cids = []
+    pages = json['data']['View']['pages']
+    for ___ in pages:
+        cids.append(___['cid'])
+
+    return cids
+
+
 def download_video_by_bvid(bvid) -> int:
     cid = get_cid_by_bvid(bvid)
     if cid == 1:
@@ -63,6 +79,35 @@ def download_video_by_bvid(bvid) -> int:
     return 0
 
 
+def download_videos_by_bvid(bvid):
+    cids = get_cids_by_bvid(bvid)
+    if len(cids) == 0:
+        return 1
+
+    player_playurl_params['bvid'] = bvid
+
+    for ____, ___ in enumerate(cids):
+        player_playurl_params['cid'] = ___
+
+        json = requests.get(url=Bilibili_API['player_playurl'],
+                            params=player_playurl_params,
+                            cookies=bilibili_cookies).json()
+
+        if json['code']:
+            print("[ERROR] request player_playurl: " + json['message'])
+            return 1
+
+        video_url = json['data']['dash']['video'][0]['baseUrl']
+        audio_url = json['data']['dash']['audio'][0]['baseUrl']
+
+        print("[N] Start download video {}...".format(____ + 1))
+        download_url_with_progressbar(video_url, bilibili_headers, 'video' + str(___))
+        download_url_with_progressbar(audio_url, bilibili_headers, 'audio' + str(___))
+        print("[N] Download video {} completed...".format(____ + 1))
+
+    return 0
+
+
 def download_url_with_progressbar(url, headers, save_path):
     res = requests.request("GET", url=url, stream=True, headers=headers)
     file_size = int(res.headers.get("Content-Length"))
@@ -86,7 +131,7 @@ def download_url_with_progressbar(url, headers, save_path):
 
 def main() -> int:
     video_bvid = input('请输入视频 BVID: ')
-    return download_video_by_bvid(video_bvid)
+    return download_videos_by_bvid(video_bvid)
 
 
 if __name__ == '__main__':
