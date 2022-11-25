@@ -3,6 +3,8 @@
 
 import requests
 import progressbar
+from enum import Enum, unique
+from time import strftime, gmtime
 
 Bilibili_API = {
     "player_playurl": 'https://api.bilibili.com/x/player/playurl',
@@ -25,6 +27,62 @@ bilibili_headers = {
 }
 
 bilibili_cookies = {"SESSDATA": 'FILLIT'}
+
+
+@unique
+class IDType(Enum):
+    AV_ID = 0
+    BV_ID = 1
+
+
+class Video:
+    def __init__(self, id_type, vid):
+        self.title = ''
+        self.cids = []
+        self.parts = []
+        self.durations = []
+        self.video_count = 0
+
+        if id_type == IDType.BV_ID:
+            web_interface_view_detail_params['bvid'] = vid
+        elif id_type == IDType.AV_ID:
+            web_interface_view_detail_params['avid'] = vid
+        else:
+            return
+        json = requests.get(url=Bilibili_API['web_interface_view_detail'],
+                            params=web_interface_view_detail_params,
+                            cookies=bilibili_cookies).json()
+        if json['code']:
+            return
+
+        self.title = json['data']['View']['title']
+        self.bvid = json['data']['View']['bvid']
+        self.avid = json['data']['View']['aid']
+        pages = json['data']['View']['pages']
+        self.video_count = len(pages)
+
+        for ___ in pages:
+            self.cids.append(___['cid'])
+            self.parts.append(___['part'])
+            self.durations.append(___['duration'])
+
+    def video_detail(self):
+        print("[INFO] 共找到 {} 个视频".format(self.video_count))
+        if self.video_count == 0:
+            return
+        elif self.video_count == 1:
+            print(self.title + ' ' + '(' + strftime("%H:%M:%S", gmtime(self.durations[0])) + ')')
+            return
+        for ___ in range(0, self.video_count):
+            print(self.title + ' - ' + self.parts[___] +
+                  ' ' + '(' + strftime("%H:%M:%S", gmtime(self.durations[___])) + ')')
+
+
+class Downloader:
+    def __init__(self, video):
+        self.video = video
+        print(self.video.title)
+        pass
 
 
 def get_cid_by_bvid(bvid) -> int:
@@ -131,7 +189,12 @@ def download_url_with_progressbar(url, headers, save_path):
 
 def main() -> int:
     video_bvid = input('请输入视频 BVID: ')
-    return download_videos_by_bvid(video_bvid)
+    # return download_videos_by_bvid(video_bvid)
+
+    video = Video(IDType.BV_ID, video_bvid)
+    downloader = Downloader(video)
+
+    return 0
 
 
 if __name__ == '__main__':
